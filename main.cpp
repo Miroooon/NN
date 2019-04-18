@@ -5,7 +5,7 @@
 using namespace std;
 
 #define SIZE 100
-#define LR 0.3
+#define LR 0.25000
 
 double randM(double M, double N){
     return (M + (rand() / (RAND_MAX/(N-M))))-0.5;
@@ -169,6 +169,8 @@ matrix matrix_multiplication(matrix Matrix1, matrix Matrix2){
 
 class NeuralNetwork{
     public:
+        matrix wih;
+        matrix who;
         NeuralNetwork(int input_nodes, int hidden_nodes, int output_nodes, float learningrate){
             i_n = input_nodes;
             o_n = output_nodes;
@@ -188,8 +190,8 @@ class NeuralNetwork{
             m.init(SIZE, 784, 0);
 
             srand(time(NULL));
-            wih.init(h_n, i_n, 1);
-            who.init(o_n, h_n, 1);
+            wih.init(SIZE, 784, 1);
+            who.init(10, SIZE, 1);
 
         }
 
@@ -197,6 +199,7 @@ class NeuralNetwork{
             //who
             //self.who += self.lr * numpy.dot((output_errors * final_outputs * ( 1.0 - final_outputs)), numpy.transpose(hidden_outputs))
             float tempk = 0.0;
+
             for (int i = 0; i < 10; i++) {
                 for (int j = 0; j < 1; j++) {
                     a.mat[i][j] = 1.0000 - final_outputs.mat[i][j];
@@ -294,6 +297,24 @@ class NeuralNetwork{
                     wih.mat[i][j] = wih.mat[i][j] + m.mat[i][j];
                 }
             }
+            if(cou == 9999){
+                FILE *file;
+                file = fopen("w.csv", "w");
+                for (int i = 0; i < 100; i++) {
+                    for (int j = 0; j < 784; j++) {
+                        fprintf(file, "%f,", wih.mat[i][j]);
+                    }
+                }
+                fprintf(file,"\n");
+
+                for (int i = 0; i < 10; i++) {
+                    for (int j = 0; j < 100; j++) {
+                        fprintf(file, "%f,", who.mat[i][j]);
+                    }
+                }
+                fclose(file);
+            }
+            cou++;
             freeAll();
         }
 
@@ -311,10 +332,10 @@ class NeuralNetwork{
 
             hidden_inputs = matrix_multiplication(wih, inputs);
             hidden_outputs = sigmoida(hidden_inputs);
-            std::cout << "done" << '\n';
 
             final_inputs = matrix_multiplication(who, hidden_outputs);
             final_outputs = sigmoida(final_inputs);
+
             output_errors = targets - final_outputs;
             whoT = who.transpose();
             hidden_errors = matrix_multiplication(whoT, output_errors);
@@ -322,7 +343,49 @@ class NeuralNetwork{
             back(inputs, targets);
         }
 
+        void init_w(){
+            FILE* file;
+            char* mass;
+            char* pch;
+            char buff[2500000];
+            file = fopen("w.csv", "r");
+
+
+            mass = fgets(buff, 2500000, file);
+            for (int i = 0; i < 100; i++){
+                for (int j = 0; j < 784; j++) {
+                    if(i == 0 && j == 0){
+                        pch = strtok(mass,",");
+                        wih.mat[0][0] = atof(pch);
+                        continue;
+                    }
+                    pch = strtok(NULL, ",");
+                    wih.mat[i][j] = atof(pch);
+                }
+            }
+
+
+
+            mass = fgets(buff, 30000, file);
+            for (int i = 0; i < 10; i++){
+                for (int j = 0; j < 100; j++) {
+                    if(i == 0 && j == 0){
+                        pch = strtok(mass,",");
+                        who.mat[0][0] = atof(pch);
+                        continue;
+                    }
+                    pch = strtok(NULL, ",");
+                    who.mat[i][j] = atof(pch);
+                }
+            }
+
+
+
+            fclose(file);
+        }
+
         matrix quary(matrix inputs){
+
             hidden_inputs = matrix_multiplication(wih, inputs);
             hidden_outputs = sigmoida(hidden_inputs);
 
@@ -339,18 +402,19 @@ class NeuralNetwork{
     private:
         matrix hidden_inputs;
         matrix hidden_outputs;
-
         matrix final_inputs;
         matrix final_outputs;
         matrix whoT;
 
         matrix hidden_errors;
         matrix output_errors;
+
         int i_n;
         int o_n;
         int h_n;
         int lr;
         int cs;
+        int cou = 0;
 
         matrix a;
         matrix b;
@@ -364,34 +428,21 @@ class NeuralNetwork{
         matrix l ;
         matrix m ;
 
-        matrix wih;
-        matrix who;
 
-        float tempk;
 
 };
 
-
-
-int main(int argc, char const *argv[]) {
-    int input_nodes = 784;
-    int hidden_nodes = SIZE;
-    int output_nodes = 10;
-    float learning_rate = LR;
-
-    NeuralNetwork nn(input_nodes, hidden_nodes, output_nodes, learning_rate);
-
+void train(NeuralNetwork ner){
     FILE* file;
     char *mass;
     char* pch;
     char buff[3000];
-    file = fopen("mnist_train.csv", "r");
 
     matrix inputs(784, 1);
     matrix targets(10,1);
     int correct_label;
 
-    for (size_t zen = 0; zen < 2; zen++) {
+    for (size_t zen = 0; zen < 1; zen++) {
         file = fopen("mnist_train.csv", "r");
         int count = 0;
         while (count < 10000) {
@@ -410,36 +461,40 @@ int main(int argc, char const *argv[]) {
                 inputs.mat[i][0] = (atoi(pch)/ 255.001 * 0.99) + 0.01;
             }
             cout << count << '\n';
-            nn.train(inputs, targets);
-
-
+            ner.train(inputs, targets);
             count++;
         }
     fclose(file);
     }
+}
 
-
-    std::cout<< '\n' << "Enter name's file" << '\n';
-    //std::cin >> ;
+void quary(NeuralNetwork ner){
+    FILE* file;
+    char *mass;
+    char* pch;
+    char buff[3000];
     file = fopen("mnist_test.csv", "r");
-
-    int count_label;
+    matrix inputs(784, 1);
+    int count_label = 0;
     matrix final_outputs;
     float max;
     int label;
+    int correct_label;
+    ner.init_w();
 
     int count = 0;
     while (count < 10000) {
 
+
         mass = fgets(buff, 3000, file);
-        pch = strtok(mass,",");
+        pch = strtok(mass, ",");
         correct_label = atoi(pch);
 
         for (int i = 0; i < 784; i++){
             pch = strtok(NULL, ",");
             inputs.mat[i][0] = (atoi(pch)/ 255.001 * 0.99) + 0.01;
         }
-        final_outputs = nn.quary(inputs);
+        final_outputs = ner.quary(inputs);
 
 
         max = final_outputs.mat[0][0];
@@ -455,6 +510,8 @@ int main(int argc, char const *argv[]) {
             count_label++;
         }
 
+        std::cout << ner.wih.mat[99][784] << '\n';
+        std::cout << ner.who.mat[9][99] << '\n';
         std::cout << '\n';
         cout << "истинный маркер - "<< correct_label << '\n';
         cout << "ответ сети - "<< label << '\n';
@@ -463,5 +520,75 @@ int main(int argc, char const *argv[]) {
 
     fclose(file);
     std::cout << '\n'<< "эффективность - "<< (count_label/(count + 0.1)) * 100.1<< '%' << '\n';
+}
+
+void oTest(NeuralNetwork ner){
+    FILE* file;
+    char *mass;
+    char* pch;
+    char buff[3000];
+    file = fopen("text.csv", "r");
+    matrix inputs(784, 1);
+    int count_label = 0;
+    matrix final_outputs;
+    float max;
+    int label;
+    int correct_label;
+
+    ner.init_w();
+
+    mass = fgets(buff, 3000, file);
+    pch = strtok(mass,",");
+    correct_label = atoi(pch);
+
+    for (int i = 0; i < 784; i++){
+        pch = strtok(NULL, ",");
+        inputs.mat[i][0] = (atoi(pch)/ 255.001 * 0.99) + 0.01;
+    }
+    final_outputs = ner.quary(inputs);
+
+
+
+    std::cout << '\n';
+    cout << "истинный маркер - "<< correct_label << '\n';
+    cout << "ответ сети - "<< label << '\n';
+
+    fclose(file);
+}
+
+int main(int argc, char const *argv[]) {
+    int input_nodes = 784;
+    int hidden_nodes = SIZE;
+    int output_nodes = 10;
+    float learning_rate = LR;
+
+    NeuralNetwork nn(input_nodes, hidden_nodes, output_nodes, learning_rate);
+
+    int choise;
+    while(1){
+        cout << "1. train" << '\n' << "2. efficiency test" << '\n' << "3. test" << '\n' << "4. train + efficiency test" << '\n' << "5. exit" << '\n' << "Enter: ";
+        cin >> choise;
+        cout << '\n';
+
+        switch (choise) {
+            case 1:
+                train(nn);
+                continue;
+            case 2:
+                quary(nn);
+                continue;
+            case 3:
+                oTest(nn);
+                continue;
+            case 4:
+                train(nn);
+                quary(nn);
+                break;
+            case 5:
+                return 0;
+        }
+    }
+
+
     return 0;
 }
